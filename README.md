@@ -66,10 +66,15 @@ python -u verify_flow.py
 | [bosslib.py](bosslib.py) | 共享设备操作（读卡片/读JD/匹配/按钮定位） |
 | [boss_auto.py](boss_auto.py) | 全自动主入口（状态+目标+循环） |
 | [verify_flow.py](verify_flow.py) | 流程验证入口（少量卡片） |
+| [statslib.py](statslib.py) | 统计记录 + HTML 日报/半周总结生成 |
 | `state.json` | 运行状态（自动生成，已 gitignore） |
+| `stats/` | 每日统计 JSON：投递/跳过明细（自动生成，已 gitignore） |
+| `reports/` | HTML 日报 + 半周总结 + 跨天总览（自动生成，已 gitignore） |
 
 ## 注意
 
+- 跑完（含中途中断）自动在 `reports/` 生成当天 HTML 日报，浏览器直接打开；周二/周五跑完额外生成半周总结。
+- `reports/overview.html` 为跨天总览（汇总卡片 + 逐日投递趋势 + 每日明细表），每次跑完自动刷新，日报页头部可跳转。
 - 打招呼用 App 默认消息，不发送自定义内容。
 - 按钮文本会随状态变化：未打过显示"立即沟通"（计入），已打过显示"继续沟通"（不计入）。
 - 频繁自动化可能触发平台风控，建议控制每日数量、保持账号正常活跃。

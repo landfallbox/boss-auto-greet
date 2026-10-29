@@ -90,3 +90,8 @@ SWIPE_PAUSE = (2.5, 4.5)  # 上滑加载后随机等待区间
 JD_SWIPE = (540, 1700, 540, 900)
 # 列表页上滑（加载下一屏）
 LIST_SWIPE = (540, 1800, 540, 800)
+
+# ---------- 统计与报告 ----------
+# 每日统计 JSON 与 HTML 日报输出目录（相对项目根目录，已 gitignore）
+STATS_DIR = "stats"
+REPORTS_DIR = "reports"

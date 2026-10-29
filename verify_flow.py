@@ -63,7 +63,8 @@ def main():
                 continue
 
             title, city, exp = bl.read_detail_header(d)
-            if not bl.pre_filter(title, city, exp, card_salary):
+            passed, _ = bl.pre_filter(title, city, exp, card_salary)
+            if not passed:
                 print("[%d] 前置不匹配: %s | %s | %s" % (i, title, city, exp))
                 skipped += 1
                 bl.back_to_list(d)
