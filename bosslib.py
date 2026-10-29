@@ -23,8 +23,26 @@ def adb_shell(cmd):
                    capture_output=True, timeout=30)
 
 
+_FOCUS_RE = re.compile(r"mCurrentFocus=Window\{[^}]*?u(\d+)\s+([\w.]+)/([\w.]+)\}")
+
+
+def app_current(d):
+    """读当前前台 App：直接解析 `dumpsys window` 的 mCurrentFocus。
+
+    uiautomator2 的 app_current() 依赖 `dumpsys window windows`，
+    但 MIUI + XSpace 双开下该命令不含 mCurrentFocus，会回退到
+    `dumpsys activity top` 误读后台 App；`dumpsys window` 才是可靠的。
+    """
+    out = subprocess.run(["adb", "-s", C.SERIAL, "shell", "dumpsys", "window"],
+                         capture_output=True, timeout=30).stdout.decode("utf-8", "ignore")
+    m = _FOCUS_RE.search(out)
+    if m:
+        return {"package": m.group(2), "activity": m.group(3)}
+    return d.app_current()
+
+
 def current_activity(d):
-    return d.app_current().get("activity", "")
+    return app_current(d).get("activity", "")
 
 
 # ---------- 页面导航 ----------
@@ -33,7 +51,7 @@ def ensure_list_page(d):
     """确保在职位推荐列表页（MainActivity）"""
     d.screen_on()
     time.sleep(1)
-    cur = d.app_current()
+    cur = app_current(d)
     if cur.get("package") != C.PKG:
         adb_shell("am start --user %d -n %s/%s" % (C.USER, C.PKG, C.LAUNCH_ACT))
         time.sleep(10)
@@ -43,7 +61,7 @@ def ensure_list_page(d):
         d.press("back")
         time.sleep(C.BACK_WAIT)
     if C.MAIN_ACT not in current_activity(d):
-        raise RuntimeError("无法到达列表页: %s" % d.app_current())
+        raise RuntimeError("无法到达列表页: %s" % app_current(d))
     # 切到"职位"tab，确保推荐列表可见（App 可能停在消息/我的等 tab）
     try:
         d(text="职位").click()
@@ -65,19 +83,21 @@ def back_to_list(d, max_back=3):
 # ---------- 列表页 ----------
 
 def read_cards(d):
-    """返回可见卡片列表 [(title, city, cx, cy)]"""
+    """返回可见卡片列表 [(title, city, salary, cx, cy)]"""
     cards = d(resourceId="com.hpbr.bosszhipin:id/boss_job_card_view")
     out = []
     for i in range(cards.count):
         c = cards[i]
         t = c.child(resourceId="com.hpbr.bosszhipin:id/tv_position_name")
         ct = c.child(resourceId="com.hpbr.bosszhipin:id/tv_distance")
+        s = c.child(resourceId="com.hpbr.bosszhipin:id/tv_salary_statue")
         if not t.exists:
             continue
         title = t.info["text"].strip()
         city = ct.info["text"].strip() if ct.exists else ""
+        salary = s.info["text"].strip() if s.exists else ""
         b = c.info["bounds"]
-        out.append((title, city,
+        out.append((title, city, salary,
                     (b["left"] + b["right"]) // 2,
                     (b["top"] + b["bottom"]) // 2))
     return out
@@ -148,13 +168,35 @@ def find_chat_btn(d):
 
 # ---------- 匹配 ----------
 
-def pre_filter(title, city, exp):
-    """前置过滤：城市 + 经验 + 排除词"""
+def pre_filter(title, city, exp, salary=""):
+    """前置过滤：排除词 + 城市 + 届别 + 经验 + 薪资。
+
+    目标画像：27 届应届生。校招/应届、实习、经验 1 年以内都可投；
+    其他届别（26届/25届/26秋招/2026校园招聘）、要求 1 年以上经验的跳过；
+    "经验不限"岗位若月薪上限超过 MAX_SALARY_K 也跳过（超出应届水平）。
+    """
     if any(w in title for w in C.SKIP_WORDS):
         return False
-    if "在校" in exp or "应届" in exp:
+    if any(w in title for w in C.SKIP_JOB_TYPES):
         return False
-    return any(ct in city for ct in C.CITIES)
+    if not any(ct in city for ct in C.CITIES):
+        return False
+    # 届别：标题带届/秋招/校园招聘年份时，只认 27 届（2027）
+    m = re.search(r"(\d{2})届|(\d{2})秋招|(20\d{2})校园招聘", title)
+    if m:
+        years = [g for g in m.groups() if g]
+        if not any(y in (str(C.GRAD_YEAR), str(2000 + C.GRAD_YEAR)) for y in years):
+            return False
+    # 经验：要求 1 年以上（1-3年 / 3-5年 / 5年以上 …）跳过
+    if re.search(r"\d+\s*[-~～]\s*\d+\s*年|\d+\s*年以上", exp):
+        return False
+    # 在校/应届、经验不限、1年以内 都接受
+    # 薪资：仅"经验不限"岗位按月薪上限判断
+    if "不限" in exp and salary:
+        sm = re.search(r"(\d+(?:\.\d+)?)\s*[-~～]\s*(\d+(?:\.\d+)?)\s*[Kk千]", salary)
+        if sm and float(sm.group(2)) > C.MAX_SALARY_K:
+            return False
+    return True
 
 
 def jd_missing_skill(jd_text):

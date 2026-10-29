@@ -47,6 +47,8 @@ def main():
             if not t.exists:
                 continue
             card_title = t.info["text"].strip()
+            sc = c.child(resourceId="com.hpbr.bosszhipin:id/tv_salary_statue")
+            card_salary = sc.info["text"].strip() if sc.exists else ""
 
             # 点卡片进详情（最多试 2 次）
             entered = False
@@ -61,7 +63,7 @@ def main():
                 continue
 
             title, city, exp = bl.read_detail_header(d)
-            if not bl.pre_filter(title, city, exp):
+            if not bl.pre_filter(title, city, exp, card_salary):
                 print("[%d] 前置不匹配: %s | %s | %s" % (i, title, city, exp))
                 skipped += 1
                 bl.back_to_list(d)

@@ -67,7 +67,7 @@ def main():
 
     while st["sent"] < target and empty_scans < C.MAX_EMPTY_SCANS:
         cards = bl.read_cards(d)
-        new_cards = [(t, c, x, y) for (t, c, x, y) in cards if (t, c) not in seen]
+        new_cards = [(t, c, s, x, y) for (t, c, s, x, y) in cards if (t, c) not in seen]
         if not new_cards:
             bl.swipe_up(d)
             empty_scans += 1
@@ -75,13 +75,13 @@ def main():
         empty_scans = 0
 
         if dry:
-            for title, city, cx, cy in new_cards:
+            for title, city, salary, cx, cy in new_cards:
                 seen.add((title, city))
             save_state(st)
             bl.swipe_up(d)
             continue
 
-        for title, city, cx, cy in new_cards:
+        for title, city, salary, cx, cy in new_cards:
             if st["sent"] >= target:
                 break
             seen.add((title, city))
@@ -100,7 +100,7 @@ def main():
 
             # 详情页头信息 + 前置过滤
             d_title, d_city, d_exp = bl.read_detail_header(d)
-            if not bl.pre_filter(d_title, d_city, d_exp):
+            if not bl.pre_filter(d_title, d_city, d_exp, salary):
                 print("skip(pre): %s | %s | %s" % (d_title, d_city, d_exp))
                 bl.back_to_list(d)
                 continue
