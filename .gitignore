@@ -9,3 +9,6 @@ venv/
 
 # 调试截图
 *.png
+
+# 日志
+excalidraw.log
