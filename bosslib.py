@@ -171,32 +171,36 @@ def find_chat_btn(d):
 def pre_filter(title, city, exp, salary=""):
     """前置过滤：排除词 + 城市 + 届别 + 经验 + 薪资。
 
+    返回 (passed, reason)：通过时 (True, None)；跳过时 (False, 细分原因)。
+    原因取值：pre-skip-word / pre-job-type / pre-city / pre-grad-year /
+    pre-exp / pre-salary（供统计模块落盘，判断逻辑与旧版一致）。
+
     目标画像：27 届应届生。校招/应届、实习、经验 1 年以内都可投；
     其他届别（26届/25届/26秋招/2026校园招聘）、要求 1 年以上经验的跳过；
     "经验不限"岗位若月薪上限超过 MAX_SALARY_K 也跳过（超出应届水平）。
     """
     if any(w in title for w in C.SKIP_WORDS):
-        return False
+        return False, "pre-skip-word"
     if any(w in title for w in C.SKIP_JOB_TYPES):
-        return False
+        return False, "pre-job-type"
     if not any(ct in city for ct in C.CITIES):
-        return False
+        return False, "pre-city"
     # 届别：标题带届/秋招/校园招聘年份时，只认 27 届（2027）
     m = re.search(r"(\d{2})届|(\d{2})秋招|(20\d{2})校园招聘", title)
     if m:
         years = [g for g in m.groups() if g]
         if not any(y in (str(C.GRAD_YEAR), str(2000 + C.GRAD_YEAR)) for y in years):
-            return False
+            return False, "pre-grad-year"
     # 经验：要求 1 年以上（1-3年 / 3-5年 / 5年以上 …）跳过
     if re.search(r"\d+\s*[-~～]\s*\d+\s*年|\d+\s*年以上", exp):
-        return False
+        return False, "pre-exp"
     # 在校/应届、经验不限、1年以内 都接受
     # 薪资：仅"经验不限"岗位按月薪上限判断
     if "不限" in exp and salary:
         sm = re.search(r"(\d+(?:\.\d+)?)\s*[-~～]\s*(\d+(?:\.\d+)?)\s*[Kk千]", salary)
         if sm and float(sm.group(2)) > C.MAX_SALARY_K:
-            return False
-    return True
+            return False, "pre-salary"
+    return True, None
 
 
 def jd_missing_skill(jd_text):
